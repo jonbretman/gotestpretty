@@ -5,19 +5,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
 )
 
 type testOutput struct {
-	Time    string
 	Action  string
 	Package string
 	Test    string
 	Output  string
+}
+
+type testResult struct {
+	packageName string
+	name        string
+	fixtures    map[string]*testResult
+	isFixture   bool
+	pass        bool
+	output      []string
 }
 
 var (
@@ -32,15 +43,11 @@ var (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var line []byte
 
-	currTestName := ""
-	currPackageName := ""
-	currTestOutput := []string{}
-	currFixtures := map[string]bool{}
+	var currLine []byte
+	var currTest *testResult
 
-	passed := 0
-	failed := 0
+	tests := map[string]*testResult{}
 
 	for {
 		input, _, err := reader.ReadRune()
@@ -49,18 +56,18 @@ func main() {
 		}
 
 		if input != '\n' {
-			line = append(line, byte(input))
+			currLine = append(currLine, byte(input))
 			continue
 		}
 
 		var o testOutput
-		err = json.Unmarshal([]byte(line), &o)
+		err = json.Unmarshal(currLine, &o)
 		if err != nil {
 			panic(err)
 		}
 
 		// reset line
-		line = []byte{}
+		currLine = []byte{}
 
 		switch o.Action {
 		case "skip":
@@ -68,28 +75,37 @@ func main() {
 			continue
 
 		case "run":
-			// A test run with t.Run inside another test
-			if currTestName != "" && strings.HasPrefix(o.Test, currTestName+"/") {
-				currFixtures[o.Test] = false
+			// A test run with t.Run() inside another test
+			if currTest != nil && strings.HasPrefix(o.Test, currTest.name+"/") {
+				currTest.fixtures[o.Test] = &testResult{
+					name:        o.Test,
+					packageName: o.Package,
+					isFixture:   true,
+				}
+				tests[o.Test] = currTest.fixtures[o.Test]
 				continue
 			}
 
-			currTestName = o.Test
-			currPackageName = o.Package
-			fmt.Printf("%s %s %s", run(" RUN "), lightGrey(currPackageName), currTestName)
+			t := &testResult{
+				name:        o.Test,
+				packageName: o.Package,
+				fixtures:    map[string]*testResult{},
+			}
+			tests[t.name] = t
+			currTest = t
+			fmt.Printf("%s %s %s", run(" RUN "), lightGrey(t.packageName), t.name)
 			continue
 
 		case "pass", "fail":
-			// Not interested in pass/fail actions that are not for tests
-			if o.Test == "" {
+			t, ok := tests[o.Test]
+			if !ok {
 				continue
 			}
 
+			t.pass = o.Action == "pass"
+
 			// A test run with t.Run inside another test
-			if o.Test != currTestName && strings.HasPrefix(o.Test, currTestName+"/") {
-				if o.Action == "pass" {
-					currFixtures[o.Test] = true
-				}
+			if t.isFixture {
 				continue
 			}
 
@@ -98,38 +114,33 @@ func main() {
 				tag = fail(" FAIL ")
 			}
 
-			fmt.Printf("\r%s %s %s\n", tag, lightGrey(currPackageName), currTestName)
+			fmt.Printf("\r%s %s %s\n", tag, lightGrey(t.packageName), t.name)
 
 			// List test run with t.Run inside this test
-			for name, result := range currFixtures {
+			for _, fixture := range t.fixtures {
 				s := boldGreen("✓")
-				if !result {
+				if !fixture.pass {
 					s = boldRed("✕")
 				}
-				fmt.Printf("\t%s %s\n", s, lightGrey(strings.TrimPrefix(name, currTestName+"/")))
-			}
-
-			// Print output from failing test
-			if o.Action == "fail" {
-				failed++
-				for _, o := range currTestOutput {
-					fmt.Print(o)
-				}
-			} else {
-				passed++
+				fmt.Printf("\t%s %s\n", s, lightGrey(strings.TrimPrefix(fixture.name, t.name+"/")))
 			}
 
 			// reset everything
-			currTestName = ""
-			currTestOutput = nil
-			currFixtures = map[string]bool{}
+			currTest = nil
 			continue
 		case "output":
+			t, ok := tests[o.Test]
+			if !ok {
+				// Unknown output
+				lightGrey(o.Output)
+				continue
+			}
+
 			output := strings.TrimLeft(o.Output, " ")
 
 			// Ignore the "Error Trace: name_of_file.go" output from failing tests
-			if len(currTestOutput) > 0 {
-				f := fileNameRegexp.FindAllString(currTestOutput[len(currTestOutput)-1], -1)
+			if len(t.output) > 0 {
+				f := fileNameRegexp.FindAllString(t.output[len(t.output)-1], -1)
 				if len(f) == 1 && strings.Contains(output, "Error Trace:") && strings.Contains(output, f[0]) {
 					continue
 				}
@@ -150,24 +161,90 @@ func main() {
 				continue
 			}
 
-			if currTestName != "" {
-				currTestOutput = append(currTestOutput, o.Output)
-				continue
-			}
-
-			// Unknown output
-			lightGrey(o.Output)
+			t.output = append(t.output, o.Output)
 			continue
 		default:
 			panic(fmt.Sprintf("Unknown test action: %s", o.Action))
 		}
+	}
 
+	passed := 0
+	failed := 0
+	for _, t := range tests {
+		if t.pass {
+			passed++
+			continue
+		}
+
+		failed++
+
+		// If a failed tests has no output then it will be the "parent" test of one
+		// run with t.Run()
+		if len(t.output) == 0 {
+			continue
+		}
+
+		// Package name and tests name
+		fmt.Printf("\n%s - %s:\n", lightGrey(t.packageName), boldRed(t.name))
+
+		// Output of failed test
+		for _, o := range t.output {
+
+			// Try to find the file containing the test and print the relevant lines
+			m := fileNameRegexp.FindAllString(o, -1)
+			if len(m) == 1 && strings.TrimSpace(o) == m[0]+":" {
+				p := strings.Split(strings.TrimSpace(o), ":")
+				filename := p[0]
+				lineNo, _ := strconv.Atoi(p[1])
+				code := getCode(t.packageName, filename, lineNo)
+				fmt.Printf("\n%s\n\n", code)
+				continue
+			}
+
+			o = strings.Replace(o, "expected:", boldGreen("expected:"), 1)
+			o = strings.Replace(o, "actual  :", boldRed("actual  :"), 1)
+			fmt.Print(o)
+		}
 	}
 
 	// Print summary
 	fmt.Printf(
-		"\nTests:  %s, %s, %s\n",
+		"\nSummary:  %s, %s, %s\n",
 		boldGreen(fmt.Sprintf("%d passed", passed)),
 		boldRed(fmt.Sprintf("%d failed", failed)),
 		fmt.Sprintf("%d total", passed+failed))
+}
+
+func getCode(packageName string, filename string, lineNumber int) string {
+	dirs := strings.Split(packageName, "/")
+	for i := len(dirs) - 1; i >= 0; i-- {
+		possibleFilePath := path.Join(path.Join(dirs[i:]...), filename)
+		c, err := ioutil.ReadFile(possibleFilePath)
+		if err != nil {
+			continue
+		}
+
+		lineNumbers := []int{
+			lineNumber - 2,
+			lineNumber - 1,
+			lineNumber,
+			lineNumber + 1,
+			lineNumber + 2,
+		}
+		code := strings.Split(string(c), "\n")[lineNumber-3 : lineNumber+2]
+		result := []string{}
+
+		for i, line := range code {
+			if lineNumbers[i] == lineNumber {
+				result = append(result, fmt.Sprintf(" %s %d |%s", boldRed(">"), lineNumbers[i], line))
+				continue
+			}
+
+			result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%d", lineNumbers[i])), lightGrey(line)))
+		}
+
+		return filename + ":\n" + strings.Join(result, "\n")
+	}
+
+	return filename
 }
