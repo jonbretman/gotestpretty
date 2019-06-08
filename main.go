@@ -201,6 +201,7 @@ func main() {
 				continue
 			}
 
+			// highlight some key lines
 			o = strings.Replace(o, "expected:", boldGreen("expected:"), 1)
 			o = strings.Replace(o, "actual  :", boldRed("actual  :"), 1)
 			fmt.Print(o)
@@ -217,34 +218,47 @@ func main() {
 
 func getCode(packageName string, filename string, lineNumber int) string {
 	dirs := strings.Split(packageName, "/")
+
+	// try to find file in subdirectory
 	for i := len(dirs) - 1; i >= 0; i-- {
 		possibleFilePath := path.Join(path.Join(dirs[i:]...), filename)
-		c, err := ioutil.ReadFile(possibleFilePath)
+		b, err := ioutil.ReadFile(possibleFilePath)
 		if err != nil {
 			continue
 		}
 
-		lineNumbers := []int{
-			lineNumber - 2,
-			lineNumber - 1,
-			lineNumber,
-			lineNumber + 1,
-			lineNumber + 2,
-		}
-		code := strings.Split(string(c), "\n")[lineNumber-3 : lineNumber+2]
-		result := []string{}
-
-		for i, line := range code {
-			if lineNumbers[i] == lineNumber {
-				result = append(result, fmt.Sprintf(" %s %d |%s", boldRed(">"), lineNumbers[i], line))
-				continue
-			}
-
-			result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%d", lineNumbers[i])), lightGrey(line)))
-		}
-
-		return filename + ":\n" + strings.Join(result, "\n")
+		return formatCode(filename, string(b), lineNumber)
 	}
 
+	// try in the current directory
+	b, err := ioutil.ReadFile(filename)
+	if err == nil {
+		return formatCode(filename, string(b), lineNumber)
+	}
+
+	// fall back to just showing the filename
 	return filename
+}
+
+func formatCode(filename string, code string, lineNumber int) string {
+	lineNumbers := []int{
+		lineNumber - 2,
+		lineNumber - 1,
+		lineNumber,
+		lineNumber + 1,
+		lineNumber + 2,
+	}
+	lines := strings.Split(code, "\n")[lineNumber-3 : lineNumber+2]
+	result := []string{}
+
+	for i, line := range lines {
+		if lineNumbers[i] == lineNumber {
+			result = append(result, fmt.Sprintf(" %s %d |%s", boldRed(">"), lineNumbers[i], line))
+			continue
+		}
+
+		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%d", lineNumbers[i])), lightGrey(line)))
+	}
+
+	return filename + ":\n" + strings.Join(result, "\n")
 }
