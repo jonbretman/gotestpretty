@@ -36,6 +36,7 @@ var (
 	pass           = color.New(color.BgHiGreen).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	run            = color.New(color.BgYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	boldGreen      = color.New(color.FgHiGreen).Add(color.Bold).SprintFunc()
+	red            = color.New(color.FgHiRed).SprintFunc()
 	boldRed        = color.New(color.FgHiRed).Add(color.Bold).SprintFunc()
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
 	fileNameRegexp = regexp.MustCompile("[a-zA-Z_]+?\\.go:\\d+")
@@ -185,7 +186,7 @@ func main() {
 		}
 
 		// Package name and tests name
-		fmt.Printf("\n%s %s %s:\n", fail(" FAIL "), lightGrey(t.packageName), t.name)
+		fmt.Printf("\n%s %s %s", fail(" FAIL "), lightGrey(t.packageName), red(t.name))
 
 		// Output of failed test
 		for _, o := range t.output {
@@ -227,7 +228,7 @@ func getCode(packageName string, filename string, lineNumber int) string {
 			continue
 		}
 
-		return formatCode(filename, string(b), lineNumber)
+		return formatCode(possibleFilePath, string(b), lineNumber)
 	}
 
 	// try in the current directory
@@ -268,5 +269,5 @@ func formatCode(filename string, code string, lineNumber int) string {
 		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%s", lineNumberFormatted)), lightGrey(line)))
 	}
 
-	return filename + ":\n" + strings.Join(result, "\n")
+	return fmt.Sprintf("%s:%d\n%s", filename, lineNumber, strings.Join(result, "\n"))
 }
