@@ -251,13 +251,21 @@ func formatCode(filename string, code string, lineNumber int) string {
 	lines := strings.Split(code, "\n")[lineNumber-3 : lineNumber+2]
 	result := []string{}
 
+	// Get the number of chars in the highest line number so that we can
+	// correctly pad all line numbers so they take up the same number of
+	// chars. This is important when your test failure is on line 11 for
+	// example so that we can format it like: " 8"," 9", "10" etc.
+	maxLineNumberWidth := len(strconv.Itoa(lineNumbers[len(lineNumbers)-1]))
+
 	for i, line := range lines {
+		lineNumberFormatted := fmt.Sprintf("%*d", maxLineNumberWidth, lineNumbers[i])
+
 		if lineNumbers[i] == lineNumber {
-			result = append(result, fmt.Sprintf(" %s %d |%s", boldRed(">"), lineNumbers[i], line))
+			result = append(result, fmt.Sprintf(" %s %s |%s", boldRed(">"), lineNumberFormatted, line))
 			continue
 		}
 
-		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%d", lineNumbers[i])), lightGrey(line)))
+		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%s", lineNumberFormatted)), lightGrey(line)))
 	}
 
 	return filename + ":\n" + strings.Join(result, "\n")
