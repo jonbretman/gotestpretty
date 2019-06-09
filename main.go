@@ -27,18 +27,20 @@ type testResult struct {
 	name        string
 	fixtures    map[string]*testResult
 	isFixture   bool
+	skipped     bool
 	pass        bool
 	output      []string
 }
 
 var (
-	fail           = color.New(color.BgHiRed).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
-	pass           = color.New(color.BgHiGreen).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
-	run            = color.New(color.BgYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
+	failTag        = color.New(color.BgHiRed).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
+	passTag        = color.New(color.BgHiGreen).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
+	skipTag        = color.New(color.BgYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	boldGreen      = color.New(color.FgHiGreen).Add(color.Bold).SprintFunc()
 	red            = color.New(color.FgHiRed).SprintFunc()
 	boldRed        = color.New(color.FgHiRed).Add(color.Bold).SprintFunc()
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
+	orange         = color.New(color.FgYellow).SprintFunc()
 	fileNameRegexp = regexp.MustCompile("[a-zA-Z_]+?\\.go:\\d+")
 )
 
@@ -72,7 +74,13 @@ func main() {
 
 		switch o.Action {
 		case "skip":
-			// do nothing
+			t, ok := tests[o.Test]
+			if !ok {
+				continue
+			}
+
+			t.skipped = true
+			fmt.Printf("\r%s %s %s\n", skipTag(" SKIP "), lightGrey(t.packageName), t.name)
 			continue
 
 		case "run":
@@ -94,7 +102,7 @@ func main() {
 			}
 			tests[t.name] = t
 			currTest = t
-			fmt.Printf("%s %s %s", run(" RUNS "), lightGrey(t.packageName), t.name)
+			fmt.Printf("%s %s %s", skipTag(" RUNS "), lightGrey(t.packageName), t.name)
 			continue
 
 		case "pass", "fail":
@@ -110,9 +118,9 @@ func main() {
 				continue
 			}
 
-			tag := pass(" PASS ")
+			tag := passTag(" PASS ")
 			if o.Action == "fail" {
-				tag = fail(" FAIL ")
+				tag = failTag(" FAIL ")
 			}
 
 			fmt.Printf("\r%s %s %s\n", tag, lightGrey(t.packageName), t.name)
@@ -128,9 +136,9 @@ func main() {
 
 			// If the tests pass don't hide any ouput since they are
 			// likely to be debug print statements
-			if t.pass == true && len(t.output) > 0 {
+			if t.pass {
 				for _, o := range t.output {
-					fmt.Printf(o)
+					fmt.Print(o)
 				}
 			}
 
@@ -179,8 +187,14 @@ func main() {
 
 	passed := 0
 	failed := 0
+	skipped := 0
 
 	for _, t := range tests {
+		if t.skipped {
+			skipped++
+			continue
+		}
+
 		if t.pass {
 			passed++
 			continue
@@ -195,7 +209,7 @@ func main() {
 		}
 
 		// Package name and tests name
-		fmt.Printf("\n%s %s %s\n", fail(" FAIL "), lightGrey(t.packageName), red(t.name))
+		fmt.Printf("\n%s %s %s\n", failTag(" FAIL "), lightGrey(t.packageName), red(t.name))
 
 		// Output of failed test
 		for _, o := range t.output {
@@ -218,12 +232,23 @@ func main() {
 		}
 	}
 
+	summary := []string{}
+	if passed > 0 {
+		summary = append(summary, boldGreen(fmt.Sprintf("%d passed", passed)))
+	}
+
+	if failed > 0 {
+		summary = append(summary, boldRed(fmt.Sprintf("%d failed", failed)))
+	}
+
+	if skipped > 0 {
+		summary = append(summary, orange(fmt.Sprintf("%d skipped", skipped)))
+	}
+
+	summary = append(summary, fmt.Sprintf("%d total", len(tests)))
+
 	// Print summary
-	fmt.Printf(
-		"\nSummary:  %s, %s, %s\n",
-		boldGreen(fmt.Sprintf("%d passed", passed)),
-		boldRed(fmt.Sprintf("%d failed", failed)),
-		fmt.Sprintf("%d total", passed+failed))
+	fmt.Printf("\nSummary:  %s\n", strings.Join(summary, ", "))
 }
 
 func getCode(packageName string, filename string, lineNumber int) string {
