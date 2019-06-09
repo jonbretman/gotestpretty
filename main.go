@@ -34,7 +34,7 @@ type testResult struct {
 var (
 	fail           = color.New(color.BgHiRed).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	pass           = color.New(color.BgHiGreen).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
-	run            = color.New(color.BgHiYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
+	run            = color.New(color.BgYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	boldGreen      = color.New(color.FgHiGreen).Add(color.Bold).SprintFunc()
 	boldRed        = color.New(color.FgHiRed).Add(color.Bold).SprintFunc()
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
