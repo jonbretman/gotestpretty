@@ -126,6 +126,14 @@ func main() {
 				fmt.Printf("\t%s %s\n", s, lightGrey(strings.TrimPrefix(fixture.name, t.name+"/")))
 			}
 
+			// If the tests pass don't hide any ouput since they are
+			// likely to be debug print statements
+			if t.pass == true && len(t.output) > 0 {
+				for _, o := range t.output {
+					fmt.Printf(o)
+				}
+			}
+
 			// reset everything
 			currTest = nil
 			continue
@@ -171,6 +179,7 @@ func main() {
 
 	passed := 0
 	failed := 0
+
 	for _, t := range tests {
 		if t.pass {
 			passed++
@@ -186,7 +195,7 @@ func main() {
 		}
 
 		// Package name and tests name
-		fmt.Printf("\n%s %s %s", fail(" FAIL "), lightGrey(t.packageName), red(t.name))
+		fmt.Printf("\n%s %s %s\n", fail(" FAIL "), lightGrey(t.packageName), red(t.name))
 
 		// Output of failed test
 		for _, o := range t.output {
@@ -198,7 +207,7 @@ func main() {
 				filename := p[0]
 				lineNo, _ := strconv.Atoi(p[1])
 				code := getCode(t.packageName, filename, lineNo)
-				fmt.Printf("\n%s\n\n", code)
+				fmt.Printf("%s\n\n", code)
 				continue
 			}
 
