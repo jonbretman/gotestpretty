@@ -185,7 +185,7 @@ func main() {
 		}
 
 		// Package name and tests name
-		fmt.Printf("\n%s - %s:\n", lightGrey(t.packageName), boldRed(t.name))
+		fmt.Printf("\n%s %s %s:\n", fail(" FAIL "), lightGrey(t.packageName), t.name)
 
 		// Output of failed test
 		for _, o := range t.output {
