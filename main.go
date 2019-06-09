@@ -93,7 +93,7 @@ func main() {
 			}
 			tests[t.name] = t
 			currTest = t
-			fmt.Printf("%s %s %s", run(" RUN "), lightGrey(t.packageName), t.name)
+			fmt.Printf("%s %s %s", run(" RUN  "), lightGrey(t.packageName), t.name)
 			continue
 
 		case "pass", "fail":
