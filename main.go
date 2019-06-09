@@ -254,7 +254,7 @@ func formatCode(filename string, code string, lineNumber int) string {
 
 	// Get the number of chars in the highest line number so that we can
 	// correctly pad all line numbers so they take up the same number of
-	// chars. This is important when your test failure is on line 11 for
+	// chars. This is important when your test failure is on line 10 for
 	// example so that we can format it like: " 8"," 9", "10" etc.
 	maxLineNumberWidth := len(strconv.Itoa(lineNumbers[len(lineNumbers)-1]))
 
