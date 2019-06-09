@@ -34,8 +34,9 @@ type testResult struct {
 var (
 	fail           = color.New(color.BgHiRed).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	pass           = color.New(color.BgHiGreen).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
-	run            = color.New(color.BgHiYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
+	run            = color.New(color.BgYellow).Add(color.FgHiBlack).Add(color.Bold).SprintFunc()
 	boldGreen      = color.New(color.FgHiGreen).Add(color.Bold).SprintFunc()
+	red            = color.New(color.FgHiRed).SprintFunc()
 	boldRed        = color.New(color.FgHiRed).Add(color.Bold).SprintFunc()
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
 	fileNameRegexp = regexp.MustCompile("[a-zA-Z_]+?\\.go:\\d+")
@@ -93,7 +94,7 @@ func main() {
 			}
 			tests[t.name] = t
 			currTest = t
-			fmt.Printf("%s %s %s", run(" RUN "), lightGrey(t.packageName), t.name)
+			fmt.Printf("%s %s %s", run(" RUNS "), lightGrey(t.packageName), t.name)
 			continue
 
 		case "pass", "fail":
@@ -123,6 +124,14 @@ func main() {
 					s = boldRed("✕")
 				}
 				fmt.Printf("\t%s %s\n", s, lightGrey(strings.TrimPrefix(fixture.name, t.name+"/")))
+			}
+
+			// If the tests pass don't hide any ouput since they are
+			// likely to be debug print statements
+			if t.pass == true && len(t.output) > 0 {
+				for _, o := range t.output {
+					fmt.Printf(o)
+				}
 			}
 
 			// reset everything
@@ -170,6 +179,7 @@ func main() {
 
 	passed := 0
 	failed := 0
+
 	for _, t := range tests {
 		if t.pass {
 			passed++
@@ -185,7 +195,7 @@ func main() {
 		}
 
 		// Package name and tests name
-		fmt.Printf("\n%s - %s:\n", lightGrey(t.packageName), boldRed(t.name))
+		fmt.Printf("\n%s %s %s\n", fail(" FAIL "), lightGrey(t.packageName), red(t.name))
 
 		// Output of failed test
 		for _, o := range t.output {
@@ -197,7 +207,7 @@ func main() {
 				filename := p[0]
 				lineNo, _ := strconv.Atoi(p[1])
 				code := getCode(t.packageName, filename, lineNo)
-				fmt.Printf("\n%s\n\n", code)
+				fmt.Printf("%s\n\n", code)
 				continue
 			}
 
@@ -227,7 +237,7 @@ func getCode(packageName string, filename string, lineNumber int) string {
 			continue
 		}
 
-		return formatCode(filename, string(b), lineNumber)
+		return formatCode(possibleFilePath, string(b), lineNumber)
 	}
 
 	// try in the current directory
@@ -251,14 +261,22 @@ func formatCode(filename string, code string, lineNumber int) string {
 	lines := strings.Split(code, "\n")[lineNumber-3 : lineNumber+2]
 	result := []string{}
 
+	// Get the number of chars in the highest line number so that we can
+	// correctly pad all line numbers so they take up the same number of
+	// chars. This is important when your test failure is on line 10 for
+	// example so that we can format it like: " 8"," 9", "10" etc.
+	maxLineNumberWidth := len(strconv.Itoa(lineNumbers[len(lineNumbers)-1]))
+
 	for i, line := range lines {
+		lineNumberFormatted := fmt.Sprintf("%*d", maxLineNumberWidth, lineNumbers[i])
+
 		if lineNumbers[i] == lineNumber {
-			result = append(result, fmt.Sprintf(" %s %d |%s", boldRed(">"), lineNumbers[i], line))
+			result = append(result, fmt.Sprintf(" %s %s |%s", boldRed(">"), lineNumberFormatted, line))
 			continue
 		}
 
-		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%d", lineNumbers[i])), lightGrey(line)))
+		result = append(result, fmt.Sprintf("   %s |%s", lightGrey(fmt.Sprintf("%s", lineNumberFormatted)), lightGrey(line)))
 	}
 
-	return filename + ":\n" + strings.Join(result, "\n")
+	return fmt.Sprintf("%s:%d\n%s", filename, lineNumber, strings.Join(result, "\n"))
 }
