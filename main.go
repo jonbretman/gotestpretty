@@ -41,6 +41,7 @@ var (
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
 	orange         = color.New(color.FgYellow).SprintFunc()
 	fileNameRegexp = regexp.MustCompile("[a-zA-Z_]+?\\.go:\\d+")
+	panicPrefix = "panic: runtime error: "
 )
 
 func main() {
@@ -199,8 +200,23 @@ func main() {
 		// Package name and tests name
 		fmt.Printf("\n%s %s %s\n", failTag(" FAIL "), lightGrey(t.packageName), red(t.name))
 
-		// Output of failed test
+		isPanic := false
 		for _, o := range t.output {
+
+			if strings.HasPrefix(o, panicPrefix) {
+				fmt.Printf("    %s%s", boldRed(panicPrefix), strings.TrimPrefix(o, panicPrefix))
+				isPanic = true
+				continue
+			}
+
+			if isPanic {
+				if strings.Contains(o, t.packageName) && !strings.HasPrefix(o, "FAIL\t") {
+					fmt.Printf("    %s", o)
+				} else {
+					fmt.Printf("    %s", lightGrey(o))
+				}
+				continue
+			}
 
 			// Try to find the file containing the test and print the relevant lines
 			m := fileNameRegexp.FindAllString(o, -1)
@@ -212,6 +228,7 @@ func main() {
 				fmt.Printf("%s\n\n", code)
 				continue
 			}
+
 
 			// highlight some key lines
 			o = strings.Replace(o, "expected:", boldGreen("expected:"), 1)
