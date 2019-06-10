@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -45,35 +44,21 @@ var (
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
+	scanner := bufio.NewScanner(os.Stdin)
 
-	var currLine []byte
 	var currTest *testResult
-
 	tests := map[string]*testResult{}
 
-	for {
-		input, _, err := reader.ReadRune()
-		if err != nil && err == io.EOF {
-			break
-		}
-
-		if input != '\n' {
-			currLine = append(currLine, byte(input))
-			continue
-		}
+	for scanner.Scan() {
+		currLine := scanner.Text()
 
 		var o testOutput
-		err = json.Unmarshal(currLine, &o)
+		err := json.Unmarshal([]byte(currLine), &o)
 		if err != nil {
 			// Must not be JSON - just output it
 			fmt.Println(string(currLine))
-			currLine = []byte{}
 			continue
 		}
-
-		// reset line
-		currLine = []byte{}
 
 		switch o.Action {
 		case "skip":

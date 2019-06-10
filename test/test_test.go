@@ -3,19 +3,20 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOne(t *testing.T) {
+func TestPass(t *testing.T) {
 	assert.Equal(t, 1, 2)
 }
 
-func TestTwo(t *testing.T) {
+func TestFail(t *testing.T) {
 	assert.Equal(t, 1, 1)
 }
 
-func TestThree(t *testing.T) {
+func TestSubTests(t *testing.T) {
 	for i, v := range []string{"one", "two", "three"} {
 		i := i
 		v := v
@@ -26,6 +27,13 @@ func TestThree(t *testing.T) {
 	}
 }
 
-func TestFour(t *testing.T) {
+func TestWithSkip(t *testing.T) {
 	t.Skip()
+}
+
+func TestWithPanic(t *testing.T) {
+	type Foo struct {
+		t *time.Time
+	}
+	Foo{}.t.Format("2006")
 }
