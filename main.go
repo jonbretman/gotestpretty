@@ -66,7 +66,10 @@ func main() {
 		var o testOutput
 		err = json.Unmarshal(currLine, &o)
 		if err != nil {
-			panic(err)
+			// Must not be JSON - just output it
+			fmt.Println(string(currLine))
+			currLine = []byte{}
+			continue
 		}
 
 		// reset line
