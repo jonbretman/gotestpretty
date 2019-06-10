@@ -17,7 +17,7 @@ $ go test ./... -v | gotestpretty
 ```
 
 #### Before
-<img width="648" src="https://user-images.githubusercontent.com/1671025/59151635-5de61800-8a2e-11e9-9941-6b0db09eafdb.png">
+![Before](https://user-images.githubusercontent.com/1671025/59179078-d5b06180-8b58-11e9-96bd-2cb6bc4a1553.png)
 
 #### After
-<img width="665" src="https://user-images.githubusercontent.com/1671025/59151636-5de61800-8a2e-11e9-90d9-eb6e57383017.png">
+![After](https://user-images.githubusercontent.com/1671025/59179081-d5b06180-8b58-11e9-87bc-67f7fad22ac0.png)
