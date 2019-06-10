@@ -9,11 +9,11 @@ import (
 )
 
 func TestPass(t *testing.T) {
-	assert.Equal(t, 1, 2)
+	assert.Equal(t, 1, 1)
 }
 
 func TestFail(t *testing.T) {
-	assert.Equal(t, 1, 1)
+	assert.Equal(t, 1, 2)
 }
 
 func TestSubTests(t *testing.T) {

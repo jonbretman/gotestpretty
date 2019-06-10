@@ -41,14 +41,16 @@ var (
 	lightGrey      = color.New(color.FgWhite).Add(color.Faint).SprintFunc()
 	orange         = color.New(color.FgYellow).SprintFunc()
 	fileNameRegexp = regexp.MustCompile("[a-zA-Z_]+?\\.go:\\d+")
-	panicPrefix = "panic: runtime error: "
+	panicPrefix    = "panic: runtime error: "
 )
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
-
-	var currTest *testResult
 	tests := map[string]*testResult{}
+
+	// A list of tests in the order they ran in so that the summary of
+	// failed tests can be shown in the same order
+	testNames := []string{}
 
 	for scanner.Scan() {
 		currLine := scanner.Text()
@@ -73,15 +75,21 @@ func main() {
 			continue
 
 		case "run":
+			testNames = append(testNames, o.Test)
+
 			// A test run with t.Run() inside another test
-			if currTest != nil && strings.HasPrefix(o.Test, currTest.name+"/") {
-				currTest.fixtures[o.Test] = &testResult{
-					name:        o.Test,
-					packageName: o.Package,
-					isFixture:   true,
+			if strings.Contains(o.Test, "/") {
+				parts := strings.Split(o.Test, "/")
+				t, ok := tests[parts[0]]
+				if ok {
+					t.fixtures[o.Test] = &testResult{
+						name:        o.Test,
+						packageName: o.Package,
+						isFixture:   true,
+					}
+					tests[o.Test] = t.fixtures[o.Test]
+					continue
 				}
-				tests[o.Test] = currTest.fixtures[o.Test]
-				continue
 			}
 
 			t := &testResult{
@@ -90,7 +98,6 @@ func main() {
 				fixtures:    map[string]*testResult{},
 			}
 			tests[t.name] = t
-			currTest = t
 			fmt.Printf("%s %s %s", skipTag(" RUNS "), lightGrey(t.packageName), t.name)
 			continue
 
@@ -131,8 +138,6 @@ func main() {
 				}
 			}
 
-			// reset everything
-			currTest = nil
 			continue
 		case "output":
 			t, ok := tests[o.Test]
@@ -178,7 +183,9 @@ func main() {
 	failed := 0
 	skipped := 0
 
-	for _, t := range tests {
+	for _, testName := range testNames {
+		t := tests[testName]
+
 		if t.skipped {
 			skipped++
 			continue
@@ -203,7 +210,22 @@ func main() {
 		isPanic := false
 		for _, o := range t.output {
 
+			// Check for a panic
 			if strings.HasPrefix(o, panicPrefix) {
+
+				// Try to find the relevant bit of code that panic'd
+				for _, o := range t.output {
+					if !strings.Contains(o, t.packageName) {
+						continue
+					}
+					m := fileNameRegexp.FindAllString(o, 1)
+					if len(m) == 1 {
+						code := getCode(t.packageName, m[0])
+						fmt.Printf("%s\n\n", code)
+						break
+					}
+				}
+
 				fmt.Printf("    %s%s", boldRed(panicPrefix), strings.TrimPrefix(o, panicPrefix))
 				isPanic = true
 				continue
@@ -221,14 +243,10 @@ func main() {
 			// Try to find the file containing the test and print the relevant lines
 			m := fileNameRegexp.FindAllString(o, -1)
 			if len(m) == 1 && strings.TrimSpace(o) == m[0]+":" {
-				p := strings.Split(strings.TrimSpace(o), ":")
-				filename := p[0]
-				lineNo, _ := strconv.Atoi(p[1])
-				code := getCode(t.packageName, filename, lineNo)
+				code := getCode(t.packageName, m[0])
 				fmt.Printf("%s\n\n", code)
 				continue
 			}
-
 
 			// highlight some key lines
 			o = strings.Replace(o, "expected:", boldGreen("expected:"), 1)
@@ -237,6 +255,7 @@ func main() {
 		}
 	}
 
+	// Output a summary
 	summary := []string{}
 	if passed > 0 {
 		summary = append(summary, boldGreen(fmt.Sprintf("%d passed", passed)))
@@ -251,12 +270,14 @@ func main() {
 	}
 
 	summary = append(summary, fmt.Sprintf("%d total", len(tests)))
-
-	// Print summary
 	fmt.Printf("\nSummary:  %s\n", strings.Join(summary, ", "))
 }
 
-func getCode(packageName string, filename string, lineNumber int) string {
+func getCode(packageName string, filenameLineNumber string) string {
+	parts := strings.Split(filenameLineNumber, ":")
+	filename := parts[0]
+	lineNumber, _ := strconv.Atoi(parts[1])
+
 	dirs := strings.Split(packageName, "/")
 
 	// try to find file in subdirectory
