@@ -140,10 +140,18 @@ func main() {
 
 			continue
 		case "output":
+			if strings.HasPrefix(o.Output, "?") && strings.HasSuffix(o.Output, "[no test files]\n") {
+				continue
+			}
+
+			if strings.HasPrefix(o.Output, "PASS") || strings.HasPrefix(o.Output, "FAIL") {
+				continue
+			}
+
 			t, ok := tests[o.Test]
 			if !ok {
 				// Unknown output
-				lightGrey(o.Output)
+				fmt.Print(lightGrey(o.Output))
 				continue
 			}
 
