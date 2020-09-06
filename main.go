@@ -252,7 +252,7 @@ func main() {
 			m := fileNameRegexp.FindAllString(o, -1)
 			if len(m) == 1 && strings.TrimSpace(o) == m[0]+":" {
 				code := getCode(t.packageName, m[0])
-				fmt.Printf("%s\n\n", code)
+				fmt.Printf("\n%s\n\n", code)
 				continue
 			}
 
